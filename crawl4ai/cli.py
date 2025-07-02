@@ -1196,39 +1196,60 @@ Always return valid, properly formatted JSON."""
             verbose
         )
 
+        # Handle deep crawl results (list) vs single result
+        if isinstance(result, list):
+            if len(result) == 0:
+                click.echo("No results found during deep crawling")
+                return
+            # Use the first result for question answering and output
+            main_result = result[0]
+            all_results = result
+        else:
+            # Single result from regular crawling
+            main_result = result
+            all_results = [result]
+
         # Handle question
         if question:
             provider, token = setup_llm_config()
-            markdown = result.markdown.raw_markdown
+            markdown = main_result.markdown.raw_markdown
             anyio.run(stream_llm_response, url, markdown, question, provider, token)
             return
         
         # Handle output
         if not output_file:
             if output == "all":
-                click.echo(json.dumps(result.model_dump(), indent=2))
+                if isinstance(result, list):
+                    output_data = [r.model_dump() for r in all_results]
+                    click.echo(json.dumps(output_data, indent=2))
+                else:
+                    click.echo(json.dumps(main_result.model_dump(), indent=2))
             elif output == "json":
-                print(result.extracted_content)
-                extracted_items = json.loads(result.extracted_content)
+                print(main_result.extracted_content)
+                extracted_items = json.loads(main_result.extracted_content)
                 click.echo(json.dumps(extracted_items, indent=2))
                 
             elif output in ["markdown", "md"]:
-                click.echo(result.markdown.raw_markdown)
+                click.echo(main_result.markdown.raw_markdown)
             elif output in ["markdown-fit", "md-fit"]:
-                click.echo(result.markdown.fit_markdown)
+                click.echo(main_result.markdown.fit_markdown)
         else:
             if output == "all":
                 with open(output_file, "w") as f:
-                    f.write(json.dumps(result.model_dump(), indent=2))
+                    if isinstance(result, list):
+                        output_data = [r.model_dump() for r in all_results]
+                        f.write(json.dumps(output_data, indent=2))
+                    else:
+                        f.write(json.dumps(main_result.model_dump(), indent=2))
             elif output == "json":
                 with open(output_file, "w") as f:
-                    f.write(result.extracted_content)
+                    f.write(main_result.extracted_content)
             elif output in ["markdown", "md"]:
                 with open(output_file, "w") as f:
-                    f.write(result.markdown.raw_markdown)
+                    f.write(main_result.markdown.raw_markdown)
             elif output in ["markdown-fit", "md-fit"]:
                 with open(output_file, "w") as f:
-                    f.write(result.markdown.fit_markdown)
+                    f.write(main_result.markdown.fit_markdown)
             
     except Exception as e:
         raise click.ClickException(str(e))
