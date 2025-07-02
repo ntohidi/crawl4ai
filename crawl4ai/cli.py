@@ -27,7 +27,10 @@ from crawl4ai import (
     PruningContentFilter,
     BrowserProfiler,
     DefaultMarkdownGenerator,
-    LLMConfig
+    LLMConfig,
+    BFSDeepCrawlStrategy,
+    DFSDeepCrawlStrategy,
+    BestFirstCrawlingStrategy,
 )
 from crawl4ai.config import USER_SETTINGS
 from litellm import completion
@@ -1014,9 +1017,11 @@ def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless
 @click.option("--question", "-q", help="Ask a question about the crawled content")
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
+@click.option("--deep-crawl", type=click.Choice(["bfs", "dfs", "best-first"]), help="Enable deep crawling with specified strategy (bfs, dfs, or best-first)")
+@click.option("--max-pages", type=int, default=10, help="Maximum number of pages to crawl in deep crawl mode")
 def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config: str, 
            extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
-           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str):
+           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int):
     """Crawl a website and extract content
     
     Simple Usage:
@@ -1155,6 +1160,27 @@ Always return valid, properly formatted JSON."""
             crawler_cfg.cache_mode = CacheMode.BYPASS
 
         crawler_cfg.scraping_strategy = LXMLWebScrapingStrategy()    
+
+        # Handle deep crawling configuration
+        if deep_crawl:
+            if deep_crawl == "bfs":
+                crawler_cfg.deep_crawl_strategy = BFSDeepCrawlStrategy(
+                    max_depth=3,
+                    max_pages=max_pages
+                )
+            elif deep_crawl == "dfs":
+                crawler_cfg.deep_crawl_strategy = DFSDeepCrawlStrategy(
+                    max_depth=3,
+                    max_pages=max_pages
+                )
+            elif deep_crawl == "best-first":
+                crawler_cfg.deep_crawl_strategy = BestFirstCrawlingStrategy(
+                    max_depth=3,
+                    max_pages=max_pages
+                )
+            
+            if verbose:
+                console.print(f"[green]Deep crawling enabled:[/green] {deep_crawl} strategy, max {max_pages} pages")
 
         config = get_global_config()
         
@@ -1354,9 +1380,11 @@ def profiles_cmd():
 @click.option("--question", "-q", help="Ask a question about the crawled content")
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
+@click.option("--deep-crawl", type=click.Choice(["bfs", "dfs", "best-first"]), help="Enable deep crawling with specified strategy")
+@click.option("--max-pages", type=int, default=10, help="Maximum number of pages to crawl in deep crawl mode")
 def default(url: str, example: bool, browser_config: str, crawler_config: str, filter_config: str, 
         extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
-        output: str, bypass_cache: bool, question: str, verbose: bool, profile: str):
+        output: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int):
     """Crawl4AI CLI - Web content extraction tool
 
     Simple Usage:
@@ -1406,7 +1434,9 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
         bypass_cache=bypass_cache,
         question=question,
         verbose=verbose,
-        profile=profile
+        profile=profile,
+        deep_crawl=deep_crawl,
+        max_pages=max_pages
     )
 
 def main():
