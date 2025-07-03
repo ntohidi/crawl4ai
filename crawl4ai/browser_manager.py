@@ -1027,7 +1027,7 @@ class BrowserManager:
                 pages = context.pages
                 page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
                 if not page:
-                    page = context.pages[0] # await context.new_page()
+                    page = pages[0] if pages else await context.new_page()
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
